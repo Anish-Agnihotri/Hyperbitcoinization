@@ -13,17 +13,17 @@ contract Hyperbitcoinization {
 
     /// ============ Structs ============
 
-    /// @notice Bet terms
+    /// @notice Individual bet
     struct Bet {
-        /// @notice Settled bet?
+        /// @notice Has bet already been settled
         bool settled;
-        /// @notice USDC-providing party sent funds
+        /// @notice Has partyUSDC sent funds
         bool USDCSent;
-        /// @notice wBTC-providing party sent funds
+        /// @notice Has partyWBTC sent funds
         bool WBTCSent;
-        /// @notice USDC-providing party
+        /// @notice Party providing USDC
         address partyUSDC;
-        /// @notice wBTC-providing party
+        /// @notice Party providing wBTC
         address partyWBTC;
         /// @notice Bet starting timestamp
         uint256 startTimestamp;
@@ -147,15 +147,14 @@ contract Hyperbitcoinization {
         // Mark bet settled
         bet.settled = true;
 
-        // Collect BTC price
-        uint256 btcPrice = getBTCPrice();
-
         // Check for winner
-        address winner = btcPrice > WINNING_BTC_PRICE ? bet.partyWBTC : bet.partyUSDC;
+        address winner = getBTCPrice() > WINNING_BTC_PRICE 
+            ? bet.partyWBTC 
+            : bet.partyUSDC;
 
         // Send funds to winner
-        USDC.transferFrom(address(this), winner, 1_000_000e6);
-        WBTC.transferFrom(address(this), winner, 1e8);
+        USDC.transferFrom(address(this), winner, USDC_AMOUNT);
+        WBTC.transferFrom(address(this), winner, WBTC_AMOUNT);
     }
 
     /// @notice Allows any bet party to withdraw funds while bet is pending
@@ -165,12 +164,12 @@ contract Hyperbitcoinization {
         require(bet.startTimestamp == 0, "Bet already started");
         require(msg.sender == bet.partyUSDC || msg.sender == bet.partyWBTC, "Not bet participant");
 
-        // If USDC received, return
+        // If USDC received, return USDC
         if (bet.USDCSent) {
             bet.USDCSent = false;
             USDC_TOKEN.transferFrom(address(this), bet.partyUSDC, USDC_AMOUNT);
         }
-        // Else, return wBTC
+        // If wBTC received, return wBTC
         if (bet.WBTCSent) {
             bet.WBTCSent = false;
             WBTC_TOKEN.transferFrom(address(this), bet.partyWBTC, WBTC_AMOUNT);
