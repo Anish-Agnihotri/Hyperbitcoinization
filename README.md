@@ -9,4 +9,4 @@ Simple smart contract that configures a 1M [USDC](https://www.circle.com/en/usdc
 
 ## License
 
-[GNU Affero GPL v3.0]()
+[GNU Affero GPL v3.0](https://github.com/Anish-Agnihotri/Hyperbitcoinization/blob/master/LICENSE)
