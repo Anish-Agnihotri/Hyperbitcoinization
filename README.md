@@ -7,6 +7,20 @@ Simple smart contract that configures a 1M [USDC](https://www.circle.com/en/usdc
 3. Bet is frozen for 90 days from `startTimestamp`
 4. After 90 days, anyone call call `settleBet()`, using the [Chainlink BTC/USD](https://data.chain.link/ethereum/mainnet/crypto-usd/btc-usd) oracle to settle the bet
 
+## Test
+
+Tests use [Foundry: Forge](https://github.com/gakonst/foundry).
+
+Install Foundry using the installation steps in the README of the linked repo.
+
+```bash
+# Get dependencies
+forge update
+
+# Run tests against mainnet fork
+forge test --fork-url=YOUR_MAINNET_RPC_URL
+```
+
 ## License
 
 [GNU Affero GPL v3.0](https://github.com/Anish-Agnihotri/Hyperbitcoinization/blob/master/LICENSE)
