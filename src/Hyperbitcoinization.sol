@@ -31,7 +31,7 @@ contract Hyperbitcoinization {
     /// ============ Constants ============
 
     /// @notice 90 days
-    uint256 public constant BET_DURATION = 7776000; // 60 * 60 * 24 * 90
+    uint256 public constant BET_DURATION = 90 days;
     /// @notice USDC amount
     uint256 public constant USDC_AMOUNT = 1_000_000e6;
     /// @notice wBTC amount
@@ -89,7 +89,7 @@ contract Hyperbitcoinization {
     /// @dev Requires user to approve contract.
     /// @param betId to add funds to
     function addUSDC(uint256 betId) external {
-        Bet memory bet = bets[betId];
+        Bet storage bet = bets[betId];
         require(!bet.USDCSent, "USDC already added");
         require(msg.sender == bet.partyUSDC, "User not part of bet");
 
@@ -107,7 +107,7 @@ contract Hyperbitcoinization {
     /// @dev Requires user to approve contract.
     /// @param betId to add funds to
     function addWBTC(uint256 betId) external {
-        Bet memory bet = bets[betId];
+        Bet storage bet = bets[betId];
         require(!bet.WBTCSent, "wBTC already added");
         require(msg.sender == bet.partyWBTC, "User not part of bet");
 
@@ -131,37 +131,37 @@ contract Hyperbitcoinization {
     /// @notice Allows anyone to settle an existing bet
     /// @param betId to settle
     function settleBet(uint256 betId) external {
-        Bet memory bet = bets[betId];
+        Bet storage bet = bets[betId];
         require(!bet.settled, "Bet already settled");
-        require(bet.startTimestamp + BET_DURATION >= block.timestamp, "Bet still pending");
+        require(block.timestamp >= bet.startTimestamp + BET_DURATION, "Bet still pending");
 
         // Mark bet settled
         bet.settled = true;
 
         // Check for winner
-        address winner = getBTCPrice() > WINNING_BTC_PRICE ? bet.partyWBTC : bet.partyUSDC;
+        address winner = getBTCPrice() > WINNING_BTC_PRICE ? bet.partyUSDC : bet.partyWBTC;
 
         // Send funds to winner
-        USDC_TOKEN.transferFrom(address(this), winner, USDC_AMOUNT);
-        WBTC_TOKEN.transferFrom(address(this), winner, WBTC_AMOUNT);
+        USDC_TOKEN.transfer(winner, USDC_AMOUNT);
+        WBTC_TOKEN.transfer(winner, WBTC_AMOUNT);
     }
 
     /// @notice Allows any bet party to withdraw funds while bet is pending
     /// @param betId to withdraw
     function withdrawStale(uint256 betId) external {
-        Bet memory bet = bets[betId];
+        Bet storage bet = bets[betId];
         require(bet.startTimestamp == 0, "Bet already started");
         require(msg.sender == bet.partyUSDC || msg.sender == bet.partyWBTC, "Not bet participant");
 
         // If USDC received, return USDC
         if (bet.USDCSent) {
             bet.USDCSent = false;
-            USDC_TOKEN.transferFrom(address(this), bet.partyUSDC, USDC_AMOUNT);
+            USDC_TOKEN.transfer(bet.partyUSDC, USDC_AMOUNT);
         }
         // If wBTC received, return wBTC
         if (bet.WBTCSent) {
             bet.WBTCSent = false;
-            WBTC_TOKEN.transferFrom(address(this), bet.partyWBTC, WBTC_AMOUNT);
+            WBTC_TOKEN.transfer(bet.partyWBTC, WBTC_AMOUNT);
         }
     }
 }

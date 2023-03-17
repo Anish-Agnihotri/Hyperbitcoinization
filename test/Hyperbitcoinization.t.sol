@@ -50,18 +50,16 @@ contract HyperbitcoinizationTest is Test {
         USER_COUNTERPARTY = new HyperbitcoinizationUser(USDC_TOKEN, WBTC_TOKEN, BET_CONTRACT);
 
         // Mock balances from whales
-        /*VM.startPrank(0x28C6c06298d514Db089934071355E5743bf21d60); // Binance
-        USDC_TOKEN.transferFrom(
-            0x28C6c06298d514Db089934071355E5743bf21d60,
+        VM.startPrank(0x28C6c06298d514Db089934071355E5743bf21d60); // Binance
+        USDC_TOKEN.transfer(
             address(USER_BALAJI),
-            BET_CONTRACT.USDC_AMOUNT()
+            BET_CONTRACT.USDC_AMOUNT() * 100
         );
-        WBTC_TOKEN.transferFrom(
-            0x28C6c06298d514Db089934071355E5743bf21d60,
+        WBTC_TOKEN.transfer(
             address(USER_COUNTERPARTY),
-            BET_CONTRACT.WBTC_AMOUNT()
+            BET_CONTRACT.WBTC_AMOUNT() * 100
         );
-        VM.stopPrank();*/
+        VM.stopPrank();
     }
 
     /// @notice Can create new bet
@@ -92,20 +90,149 @@ contract HyperbitcoinizationTest is Test {
         assertEq(partyWBTC, address(USER_COUNTERPARTY));
         assertEq(startTimestamp, 0);
     }
+
     /// @notice Can add USDC as partyUSDC
-    /// @notice Cannot add USDC if not partyUSDC
+    function testAddUSDC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        assertEq(USDC_TOKEN.balanceOf(address(BET_CONTRACT)), 0);
+        USER_BALAJI.addUSDC(betId);
+        assertEq(USDC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.USDC_AMOUNT());
+    }
+
     /// @notice Cannot add USDC twice as partyUSDC
+    function testCannotAddUSDCTwice() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        VM.expectRevert(bytes("USDC already added"));
+        USER_BALAJI.addUSDC(betId);
+    }
+
+    /// @notice Cannot add USDC if not partyUSDC
+    function testCannotAddUSDCWrongAddress() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        VM.expectRevert(bytes("User not part of bet"));
+        USER_COUNTERPARTY.addUSDC(betId);
+    }
+
     /// @notice Can add USDC as partyUSDC twice, after stale withdraw
+    function testCanAddUSDCTwiceAfterStaleWithdraw() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        VM.expectRevert(bytes("USDC already added"));
+        USER_BALAJI.addUSDC(betId);
+        (,bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        assertEq(USDCSent, true);
+        USER_BALAJI.withdrawStale(betId);
+        (,USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        assertEq(USDCSent, false);
+        USER_BALAJI.addUSDC(betId);
+        assertEq(USDC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.USDC_AMOUNT());
+    }
+
     /// @notice Can start bet after adding USDC
+    function testCanStartBetAfterAddUSDC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        (,bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        assertEq(USDCSent, true);
+    }
+
     /// @notice Can add wBTC as partyWBTC
-    /// @notice Cannot add wBTC if not partyWBTC
+    function testAddWBTC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        assertEq(WBTC_TOKEN.balanceOf(address(BET_CONTRACT)), 0);
+        USER_COUNTERPARTY.addWBTC(betId);
+        assertEq(WBTC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.WBTC_AMOUNT());
+    }
+
     /// @notice Cannot add wBTC twice as partyWBTC
-    /// @notice Can add wbTC as partyWBTC twice, after stale withdraw
+    function testCannotAddWBTCTwice() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.expectRevert(bytes("wBTC already added"));
+        USER_COUNTERPARTY.addWBTC(betId);
+    }
+
+    /// @notice Cannot add wBTC if not partyWBTC
+    function testCannotAddWBTCWrongAddress() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        VM.expectRevert(bytes("User not part of bet"));
+        USER_BALAJI.addWBTC(betId);
+    }
+
+    /// @notice Can add wBTC as partyWBTC twice, after stale withdraw
+    function testCanAddWBTCTwiceAfterStaleWithdraw() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.expectRevert(bytes("wBTC already added"));
+        USER_COUNTERPARTY.addWBTC(betId);
+        (,,bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        assertEq(WBTCSent, true);
+        USER_COUNTERPARTY.withdrawStale(betId);
+        (,,WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        assertEq(WBTCSent, false);
+        USER_COUNTERPARTY.addWBTC(betId);
+        assertEq(WBTC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.WBTC_AMOUNT());
+    }
+
     /// @notice Can start bet after adding wBTC
-    /// @notice Can withdraw stale USDC
-    /// @notice Can withdraw stale wBTC
+    function testCanStartBetAfterAddWBTC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_COUNTERPARTY.addWBTC(betId);
+        (,,bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        assertEq(WBTCSent, true);
+    }
+
     /// @notice Cannot withdraw stale if bet started
+    function testCannotWithdrawStaleAfterBetStart() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.expectRevert(bytes("Bet already started"));
+        USER_BALAJI.withdrawStale(betId);
+        VM.expectRevert(bytes("Bet already started"));
+        USER_COUNTERPARTY.withdrawStale(betId);
+    }
+
+    /// @notice No one, but bet users, can withdraw stale unstarted bet
+    function testCannotWithdrawStaleBetAsNonPartyUser() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        VM.expectRevert(bytes("Not bet participant"));
+        BET_CONTRACT.withdrawStale(betId);
+    }
+
     /// @notice Can settle unsettled bet
+    function testCanSettleBet() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        uint256 counterpartyBalanceUSDC = USER_COUNTERPARTY.USDCBalance();
+        uint256 counterpartyBalanceWBTC = USER_COUNTERPARTY.WBTCBalance();
+        VM.warp(block.timestamp + 90 days);
+        BET_CONTRACT.settleBet(betId);
+        assertEq(USER_COUNTERPARTY.USDCBalance(), counterpartyBalanceUSDC + BET_CONTRACT.USDC_AMOUNT());
+        assertEq(USER_COUNTERPARTY.WBTCBalance(), counterpartyBalanceWBTC + BET_CONTRACT.WBTC_AMOUNT());
+    }
+
     /// @notice Cannot settle settled bet
+    function testCannotSettleSettledBet() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.warp(block.timestamp + 90 days);
+        BET_CONTRACT.settleBet(betId);
+        VM.expectRevert(bytes("Bet already settled"));
+        BET_CONTRACT.settleBet(betId);
+    }
+
     /// @notice Cannot settle unfinished bet
+    function testCannotSettleUnfinishedBet() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.warp(block.timestamp + 89 days);
+        VM.expectRevert(bytes("Bet still pending"));
+        BET_CONTRACT.settleBet(betId);
+    }
 }
