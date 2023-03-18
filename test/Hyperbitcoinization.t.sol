@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Vm.sol"; // Foundry: VM
 import "forge-std/Test.sol"; // Foundry: Test
+import "./utils/PriceFeedMock.sol"; // Mock PriceFeed
 import "../src/Hyperbitcoinization.sol"; // Hyperbitcoinization
 import "./utils/HyperbitcoinizationUser.sol"; // Mock user
 
@@ -28,6 +29,10 @@ contract HyperbitcoinizationTest is Test {
     /// @notice User: Counterparty
     HyperbitcoinizationUser internal USER_COUNTERPARTY;
 
+    /// ============ Price feed ============
+
+    PriceFeedMock internal BTCUSD_PRICEFEED;
+
     /// ============ Setup ============
 
     function setUp() public {
@@ -38,11 +43,14 @@ contract HyperbitcoinizationTest is Test {
         USDC_TOKEN = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
         WBTC_TOKEN = IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
 
+        // Setup mock pricefeed
+        BTCUSD_PRICEFEED = new PriceFeedMock(); // Defaults to $25,000
+
         // Setup bet contract
         BET_CONTRACT = new Hyperbitcoinization(
             address(USDC_TOKEN),
             address(WBTC_TOKEN),
-            0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c
+            address(BTCUSD_PRICEFEED)
         );
 
         // Setup users
@@ -51,14 +59,8 @@ contract HyperbitcoinizationTest is Test {
 
         // Mock balances from whales
         VM.startPrank(0x28C6c06298d514Db089934071355E5743bf21d60); // Binance
-        USDC_TOKEN.transfer(
-            address(USER_BALAJI),
-            BET_CONTRACT.USDC_AMOUNT() * 100
-        );
-        WBTC_TOKEN.transfer(
-            address(USER_COUNTERPARTY),
-            BET_CONTRACT.WBTC_AMOUNT() * 100
-        );
+        USDC_TOKEN.transfer(address(USER_BALAJI), BET_CONTRACT.USDC_AMOUNT() * 100);
+        WBTC_TOKEN.transfer(address(USER_COUNTERPARTY), BET_CONTRACT.WBTC_AMOUNT() * 100);
         VM.stopPrank();
     }
 
@@ -120,10 +122,10 @@ contract HyperbitcoinizationTest is Test {
         USER_BALAJI.addUSDC(betId);
         VM.expectRevert(bytes("USDC already added"));
         USER_BALAJI.addUSDC(betId);
-        (,bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        (, bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
         assertEq(USDCSent, true);
         USER_BALAJI.withdrawStale(betId);
-        (,USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        (, USDCSent,,,,) = BET_CONTRACT.bets(betId);
         assertEq(USDCSent, false);
         USER_BALAJI.addUSDC(betId);
         assertEq(USDC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.USDC_AMOUNT());
@@ -133,7 +135,7 @@ contract HyperbitcoinizationTest is Test {
     function testCanStartBetAfterAddUSDC() public {
         uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
         USER_BALAJI.addUSDC(betId);
-        (,bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
+        (, bool USDCSent,,,,) = BET_CONTRACT.bets(betId);
         assertEq(USDCSent, true);
     }
 
@@ -166,10 +168,10 @@ contract HyperbitcoinizationTest is Test {
         USER_COUNTERPARTY.addWBTC(betId);
         VM.expectRevert(bytes("wBTC already added"));
         USER_COUNTERPARTY.addWBTC(betId);
-        (,,bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        (,, bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
         assertEq(WBTCSent, true);
         USER_COUNTERPARTY.withdrawStale(betId);
-        (,,WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        (,, WBTCSent,,,) = BET_CONTRACT.bets(betId);
         assertEq(WBTCSent, false);
         USER_COUNTERPARTY.addWBTC(betId);
         assertEq(WBTC_TOKEN.balanceOf(address(BET_CONTRACT)), BET_CONTRACT.WBTC_AMOUNT());
@@ -179,7 +181,7 @@ contract HyperbitcoinizationTest is Test {
     function testCanStartBetAfterAddWBTC() public {
         uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
         USER_COUNTERPARTY.addWBTC(betId);
-        (,,bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
+        (,, bool WBTCSent,,,) = BET_CONTRACT.bets(betId);
         assertEq(WBTCSent, true);
     }
 
@@ -202,17 +204,57 @@ contract HyperbitcoinizationTest is Test {
         BET_CONTRACT.withdrawStale(betId);
     }
 
-    /// @notice Can settle unsettled bet
-    function testCanSettleBet() public {
+    /// @notice Can settle unsettled bet after 90 day term is complete in favor of partyWBTC
+    function testCanSettleBetAfterTermCompletionForWBTC() public {
         uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
         USER_BALAJI.addUSDC(betId);
         USER_COUNTERPARTY.addWBTC(betId);
-        uint256 counterpartyBalanceUSDC = USER_COUNTERPARTY.USDCBalance();
-        uint256 counterpartyBalanceWBTC = USER_COUNTERPARTY.WBTCBalance();
+        BTCUSD_PRICEFEED.updatePrice(990_000e8);
+        uint256 partyWBTCBalanceUSDC = USER_COUNTERPARTY.USDCBalance();
+        uint256 partyWBTCBalanceWBTC = USER_COUNTERPARTY.WBTCBalance();
         VM.warp(block.timestamp + 90 days);
         BET_CONTRACT.settleBet(betId);
-        assertEq(USER_COUNTERPARTY.USDCBalance(), counterpartyBalanceUSDC + BET_CONTRACT.USDC_AMOUNT());
-        assertEq(USER_COUNTERPARTY.WBTCBalance(), counterpartyBalanceWBTC + BET_CONTRACT.WBTC_AMOUNT());
+        assertEq(USER_COUNTERPARTY.USDCBalance(), partyWBTCBalanceUSDC + BET_CONTRACT.USDC_AMOUNT());
+        assertEq(USER_COUNTERPARTY.WBTCBalance(), partyWBTCBalanceWBTC + BET_CONTRACT.WBTC_AMOUNT());
+    }
+
+    /// @notice Can settle unsettled bet after 90 day term is complete in favor of partyUSDC
+    function testCanSettleBetAfterTermCompletionForUSDC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        BTCUSD_PRICEFEED.updatePrice(1_000_001e8);
+        uint256 partyUSDCBalanceUSDC = USER_BALAJI.USDCBalance();
+        uint256 partyUSDCBalanceWBTC = USER_BALAJI.WBTCBalance();
+        VM.warp(block.timestamp + 90 days);
+        BET_CONTRACT.settleBet(betId);
+        assertEq(USER_BALAJI.USDCBalance(), partyUSDCBalanceUSDC + BET_CONTRACT.USDC_AMOUNT());
+        assertEq(USER_BALAJI.WBTCBalance(), partyUSDCBalanceWBTC + BET_CONTRACT.WBTC_AMOUNT());
+    }
+
+    /// @notice Can settle unsettled bet before 90 day term if in favor of partyUSDC
+    function testCanSettleBetBeforeTermCompletionForUSDC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        BTCUSD_PRICEFEED.updatePrice(1_000_001e8);
+        uint256 partyUSDCBalanceUSDC = USER_BALAJI.USDCBalance();
+        uint256 partyUSDCBalanceWBTC = USER_BALAJI.WBTCBalance();
+        VM.warp(block.timestamp + 1 days);
+        BET_CONTRACT.settleBet(betId);
+        assertEq(USER_BALAJI.USDCBalance(), partyUSDCBalanceUSDC + BET_CONTRACT.USDC_AMOUNT());
+        assertEq(USER_BALAJI.WBTCBalance(), partyUSDCBalanceWBTC + BET_CONTRACT.WBTC_AMOUNT());
+    }
+
+    /// @notice Cannot settle unsettled bet before 90 day term if in favor of partyWBTC
+    function testCannotSettleBetBeforeTermCompletionForWBTC() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        BTCUSD_PRICEFEED.updatePrice(990_000e8);
+        VM.warp(block.timestamp + 1 days);
+        VM.expectRevert(bytes("Price not met, term pending"));
+        BET_CONTRACT.settleBet(betId);
     }
 
     /// @notice Cannot settle settled bet
@@ -223,16 +265,6 @@ contract HyperbitcoinizationTest is Test {
         VM.warp(block.timestamp + 90 days);
         BET_CONTRACT.settleBet(betId);
         VM.expectRevert(bytes("Bet already settled"));
-        BET_CONTRACT.settleBet(betId);
-    }
-
-    /// @notice Cannot settle unfinished bet
-    function testCannotSettleUnfinishedBet() public {
-        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
-        USER_BALAJI.addUSDC(betId);
-        USER_COUNTERPARTY.addWBTC(betId);
-        VM.warp(block.timestamp + 89 days);
-        VM.expectRevert(bytes("Bet still pending"));
         BET_CONTRACT.settleBet(betId);
     }
 }

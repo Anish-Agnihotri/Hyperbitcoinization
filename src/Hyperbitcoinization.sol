@@ -133,13 +133,23 @@ contract Hyperbitcoinization {
     function settleBet(uint256 betId) external {
         Bet storage bet = bets[betId];
         require(!bet.settled, "Bet already settled");
-        require(block.timestamp >= bet.startTimestamp + BET_DURATION, "Bet still pending");
+
+        // Check: BTC price > required winning price
+        bool winningCondition = getBTCPrice() > WINNING_BTC_PRICE;
+        // Check if bet duration is complete
+        bool durationCompleted = block.timestamp >= bet.startTimestamp + BET_DURATION;
+
+        // Allow settling earlier (but only in favor of partyUSDC)
+        address winner;
+        if (durationCompleted) {
+            winner = winningCondition ? bet.partyUSDC : bet.partyWBTC;
+        } else {
+            require(winningCondition, "Price not met, term pending");
+            winner = bet.partyUSDC;
+        }
 
         // Mark bet settled
         bet.settled = true;
-
-        // Check for winner
-        address winner = getBTCPrice() > WINNING_BTC_PRICE ? bet.partyUSDC : bet.partyWBTC;
 
         // Send funds to winner
         USDC_TOKEN.transfer(winner, USDC_AMOUNT);
