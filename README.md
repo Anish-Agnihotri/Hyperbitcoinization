@@ -19,8 +19,8 @@ Install Foundry using the installation steps in the README of the linked repo.
 # Get dependencies
 forge update
 
-# Run tests against mainnet fork
-forge test --fork-url=YOUR_MAINNET_RPC_URL
+# Run tests
+forge test
 ```
 
 ## Potential issues
