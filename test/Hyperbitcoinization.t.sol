@@ -8,6 +8,7 @@ import "forge-std/Test.sol"; // Foundry: Test
 import "./utils/PriceFeedMock.sol"; // Mock PriceFeed
 import "../src/Hyperbitcoinization.sol"; // Hyperbitcoinization
 import "./utils/HyperbitcoinizationUser.sol"; // Mock user
+import "solmate/test/utils/mocks/MockERC20.sol"; // Mock ERC20 token
 
 /// @title HyperbitcoinizationTest
 /// @author Anish Agnihotri
@@ -16,9 +17,9 @@ contract HyperbitcoinizationTest is Test {
     /// @notice Cheatcodes
     Vm internal VM;
     /// @notice USDC token
-    IERC20 internal USDC_TOKEN;
+    MockERC20 internal USDC_TOKEN;
     /// @notice WBTC token
-    IERC20 internal WBTC_TOKEN;
+    MockERC20 internal WBTC_TOKEN;
     /// @notice Bet contract
     Hyperbitcoinization internal BET_CONTRACT;
 
@@ -40,8 +41,8 @@ contract HyperbitcoinizationTest is Test {
         VM = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
         // Setup tokens
-        USDC_TOKEN = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-        WBTC_TOKEN = IERC20(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
+        USDC_TOKEN = new MockERC20("USDC", "", 6);
+        WBTC_TOKEN = new MockERC20("wBTC", "", 8);
 
         // Setup mock pricefeed
         BTCUSD_PRICEFEED = new PriceFeedMock(); // Defaults to $25,000
@@ -57,11 +58,9 @@ contract HyperbitcoinizationTest is Test {
         USER_BALAJI = new HyperbitcoinizationUser(USDC_TOKEN, WBTC_TOKEN, BET_CONTRACT);
         USER_COUNTERPARTY = new HyperbitcoinizationUser(USDC_TOKEN, WBTC_TOKEN, BET_CONTRACT);
 
-        // Mock balances from whales
-        VM.startPrank(0x28C6c06298d514Db089934071355E5743bf21d60); // Binance
-        USDC_TOKEN.transfer(address(USER_BALAJI), BET_CONTRACT.USDC_AMOUNT() * 100);
-        WBTC_TOKEN.transfer(address(USER_COUNTERPARTY), BET_CONTRACT.WBTC_AMOUNT() * 100);
-        VM.stopPrank();
+        // Preload user balances
+        USDC_TOKEN.mint(address(USER_BALAJI), BET_CONTRACT.USDC_AMOUNT() * 100);
+        WBTC_TOKEN.mint(address(USER_COUNTERPARTY), BET_CONTRACT.WBTC_AMOUNT() * 100);
     }
 
     /// @notice Can create new bet
