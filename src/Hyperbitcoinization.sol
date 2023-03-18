@@ -125,6 +125,7 @@ contract Hyperbitcoinization {
     function getBTCPrice() public view returns (uint256) {
         // Collect BTC price
         (, int256 price,,,) = BTCUSD_PRICEFEED.latestRoundData();
+        require(price >= 0, "Incorrect pricefeed price");
         return uint256(price) / 10 ** BTCUSD_PRICEFEED.decimals();
     }
 

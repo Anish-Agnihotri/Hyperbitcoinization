@@ -266,4 +266,15 @@ contract HyperbitcoinizationTest is Test {
         VM.expectRevert(bytes("Bet already settled"));
         BET_CONTRACT.settleBet(betId);
     }
+
+    /// @notice Basic check to disallow settling when pricefeed reports incorrect price
+    function testCannotSettleWithIncorrectPricefeed() public {
+        uint256 betId = BET_CONTRACT.createBet(address(USER_BALAJI), address(USER_COUNTERPARTY));
+        USER_BALAJI.addUSDC(betId);
+        USER_COUNTERPARTY.addWBTC(betId);
+        VM.warp(block.timestamp + 90 days);
+        BTCUSD_PRICEFEED.updatePrice(-1);
+        VM.expectRevert(bytes("Incorrect pricefeed price"));
+        BET_CONTRACT.settleBet(betId);
+    }
 }

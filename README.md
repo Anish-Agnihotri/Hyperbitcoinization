@@ -26,6 +26,7 @@ forge test
 ## Potential issues
 
 1. [USDC can de-peg, (1M USDC != $1M USD)](https://github.com/Anish-Agnihotri/Hyperbitcoinization/issues/1), kudos [@supernovahs](https://github.com/supernovahs)
+2. [Chainlink oracle price manipulation](https://github.com/Anish-Agnihotri/Hyperbitcoinization/pull/2) kudos [@0xfps](https://github.com/0xfps)
 
 ## License
 
