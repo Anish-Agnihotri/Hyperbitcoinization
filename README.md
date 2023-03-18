@@ -21,6 +21,10 @@ forge update
 forge test --fork-url=YOUR_MAINNET_RPC_URL
 ```
 
+## Potential issues
+
+1. [USDC can de-peg, (1M USDC != $1M USD)](https://github.com/Anish-Agnihotri/Hyperbitcoinization/issues/1), kudos [@supernovahs](https://github.com/supernovahs)
+
 ## License
 
 [GNU Affero GPL v3.0](https://github.com/Anish-Agnihotri/Hyperbitcoinization/blob/master/LICENSE)
